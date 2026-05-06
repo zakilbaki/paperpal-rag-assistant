@@ -75,9 +75,4 @@ Backend docs: `http://localhost:8000/docs`
 - Docker
 - Render
 
-## Limitations
-
-- README-level evaluation is still missing
-- sample paper workflow is not yet documented
-- duplicate legacy files were removed, but the repo still needs one final structure pass
 
