@@ -1,58 +1,56 @@
 from __future__ import annotations
-import time
-import fitz  # PyMuPDF
-from fastapi import APIRouter, File, UploadFile, HTTPException
-from bson import ObjectId
-from app.db.mongo import get_db
 
+import logging
+import time
+from pathlib import Path
+
+import fitz
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+from app.db.mongo import get_database
+
+
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["papers"])
+MAX_UPLOAD_BYTES = 1 * 1024 * 1024
+
 
 @router.post("/upload")
-async def upload_paper(file: UploadFile = File(...)):
-    """
-    Upload a PDF, extract text, and store it in MongoDB.
-    Returns the new paper_id.
-    """
+async def upload_paper(file: UploadFile = File(...), db=Depends(get_database)):
+    """Extract and persist text from a PDF no larger than 1 MB."""
+    filename = file.filename or "document.pdf"
+    if Path(filename).suffix.lower() != ".pdf":
+        raise HTTPException(status_code=415, detail="Only PDF files are supported")
+
+    started_at = time.perf_counter()
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large; maximum size is 1 MB")
+
     try:
-        t0 = time.perf_counter()
-        contents = await file.read()
+        with fitz.open(stream=contents, filetype="pdf") as document:
+            text = "\n".join(page.get_text("text") for page in document)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid or unreadable PDF") from exc
 
-        # 🚫 Limit upload size to 1 MB
-        MAX_SIZE_MB = 1
-        if len(contents) > MAX_SIZE_MB * 1024 * 1024:
-            raise HTTPException(
-                status_code=400,
-                detail=f"File too large. Max allowed size is {MAX_SIZE_MB} MB."
-            )
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="The PDF contains no extractable text")
 
-        # Extract text from the PDF
-        text = ""
-        with fitz.open(stream=contents, filetype="pdf") as doc:
-            for page in doc:
-                text += page.get_text("text") + "\n"
+    try:
+        result = await db.papers.insert_one(
+            {
+                "filename": filename,
+                "text": text,
+                "created_at": time.time(),
+                "size_bytes": len(contents),
+            }
+        )
+    except Exception as exc:
+        logger.exception("Could not persist uploaded paper")
+        raise HTTPException(status_code=503, detail="Document storage is unavailable") from exc
 
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="Empty or unreadable PDF")
-
-        # Insert into MongoDB
-        db = get_db()
-        res = await db.papers.insert_one({
-            "filename": file.filename,
-            "text": text,
-            "created_at": time.time(),
-            "size_bytes": len(contents),
-        })
-
-        t1 = time.perf_counter()
-        paper_id = str(res.inserted_id)
-
-        return {
-            "status": "success",
-            "paper_id": paper_id,
-            "duration_ms": int((t1 - t0) * 1000)
-        }
-
-    except HTTPException:
-        raise  # preserve intentional errors (like file too large)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    return {
+        "status": "success",
+        "paper_id": str(result.inserted_id),
+        "duration_ms": int((time.perf_counter() - started_at) * 1_000),
+    }

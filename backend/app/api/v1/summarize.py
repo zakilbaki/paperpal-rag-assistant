@@ -1,11 +1,9 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from bson import ObjectId
 from bson.errors import InvalidId
-from datetime import datetime
-import asyncio
 
 from ...services.summarize_llm import summarize_text
 from ...services.db_summary import get_summary, save_summary
@@ -75,7 +73,7 @@ async def summarize_paper(payload: SummarizeIn, db=Depends(get_database)):
 
     # 1️⃣ Check cache
     if payload.use_cache:
-        cached_summary = await get_summary(payload.paper_id, summary_type)
+        cached_summary = await get_summary(db, payload.paper_id, summary_type)
         if cached_summary:
             print(f"[SUMMARY] Returning cached {summary_type} summary.")
             return SummarizeOut(
@@ -109,7 +107,7 @@ async def summarize_paper(payload: SummarizeIn, db=Depends(get_database)):
     }
 
     # 4️⃣ Save result
-    await save_summary(payload.paper_id, summary_data, summary_type)
+    await save_summary(db, payload.paper_id, summary_data, summary_type)
 
     return SummarizeOut(
         paper_id=payload.paper_id,

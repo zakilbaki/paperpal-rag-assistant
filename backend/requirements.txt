@@ -1,20 +1,16 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-motor==3.1.2
-pymongo==4.6.3
-pydantic-settings==2.5.2
-pydantic==2.9.2
-python-dotenv==1.0.1
-python-multipart==0.0.9
-pdfminer.six==20240706
-certifi
-yake==0.4.8
-numpy>=1.26.0
-scikit-learn==1.5.2
-sentence-transformers==2.2.2
-torch==2.8.0
-torchvision==0.23.0
-torchaudio==2.8.0
---extra-index-url https://download.pytorch.org/whl/cpu
+fastapi==0.119.1
+uvicorn[standard]==0.38.0
+pymongo==4.15.3
+pydantic==2.12.3
+pydantic-settings==2.11.0
+python-multipart==0.0.20
+certifi==2025.10.5
+pdfminer.six==20250506
 PyMuPDF==1.24.9
-psutil
+yake==0.4.8
+numpy==2.0.2
+scikit-learn==1.5.2
+transformers>=4.44,<5
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.8.0+cpu
+psutil>=6,<8

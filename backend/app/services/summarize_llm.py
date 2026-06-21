@@ -1,10 +1,14 @@
-from transformers import pipeline, AutoTokenizer
-import os, time, torch, re, gc, psutil
+import gc
+import os
+import re
+import time
+
+import psutil
 
 # -------------------------------------------------------
 # ⚙️ CONFIGURATION — Optimized for Render (2 GB)
 # -------------------------------------------------------
-MODEL_NAME = "facebook/bart-base"  # single lightweight model
+MODEL_NAME = os.getenv("SUMMARIZATION_MODEL_NAME", "sshleifer/distilbart-cnn-6-6")
 MAX_TOKENS_PER_CHUNK = 250
 OVERLAP = 15
 PER_CHUNK_MAX_NEW_TOKENS = 50
@@ -45,12 +49,17 @@ def clean_text(text: str) -> str:
 # 🔤 Model + Tokenizer (loaded once)
 # -------------------------------------------------------
 def _get_tokenizer():
+    from transformers import AutoTokenizer
+
     if MODEL_NAME not in _tokenizer_cache:
         _tokenizer_cache[MODEL_NAME] = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     return _tokenizer_cache[MODEL_NAME]
 
 
 def _get_summarizer():
+    import torch
+    from transformers import pipeline
+
     if MODEL_NAME not in _summarizer_cache:
         torch.set_num_threads(1)
         summarizer = pipeline(
@@ -64,10 +73,6 @@ def _get_summarizer():
         print(f"{LOG_PREFIX} 🚀 Loaded summarizer: {MODEL_NAME} (device=-1)")
         _mem("after model load")
     return _summarizer_cache[MODEL_NAME]
-
-
-# Preload once at startup
-_get_summarizer()
 
 
 # -------------------------------------------------------

@@ -2,13 +2,12 @@ import os
 import pandas as pd
 import streamlit as st
 import requests
-import threading
 import time
 
 # -----------------------------------------------------
 # CONFIG
 # -----------------------------------------------------
-BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://paperpal-backend1.onrender.com")
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
 
 st.set_page_config(
     page_title="PaperPal 2.0",
@@ -86,23 +85,6 @@ UPLOAD_URL = f"{BACKEND_BASE_URL}/api/v1/papers/upload"
 SUMMARIZE_URL = f"{BACKEND_BASE_URL}/api/v1/papers/summarize"
 KEYWORDS_URL = f"{BACKEND_BASE_URL}/api/v1/papers/keywords"
 HEALTH_URL = f"{BACKEND_BASE_URL}/api/v1/health/"
-
-# -----------------------------------------------------
-# KEEP-ALIVE THREAD
-# -----------------------------------------------------
-def keep_backend_alive(interval=300):
-    while True:
-        try:
-            requests.get(HEALTH_URL, timeout=10)
-        except:
-            pass
-        time.sleep(interval)
-
-if "keep_alive_thread" not in st.session_state:
-    st.session_state.keep_alive_thread = threading.Thread(
-        target=keep_backend_alive, args=(300,), daemon=True
-    )
-    st.session_state.keep_alive_thread.start()
 
 # -----------------------------------------------------
 # HEADER
@@ -201,7 +183,13 @@ with tab2:
     if st.button("Extract Keywords", use_container_width=True):
         with st.spinner("Extracting..."):
             try:
-                res = requests.post(KEYWORDS_URL, json={"paper_id": st.session_state["paper_id"], "top_k": top_k}).json()
+                response = requests.post(
+                    KEYWORDS_URL,
+                    json={"paper_id": st.session_state["paper_id"], "top_k": top_k},
+                    timeout=(10, 120),
+                )
+                response.raise_for_status()
+                res = response.json()
                 kws = res.get("keywords", [])
                 if kws:
                     df = pd.DataFrame(kws).sort_values("score", ascending=False)
@@ -211,4 +199,4 @@ with tab2:
             except Exception as e:
                 st.error(f"Extraction failed: {e}")
 
-st.markdown("<hr><center style='color:#94a3b8;'>PaperPal 2.0 — FastAPI × Streamlit • 2025</center>", unsafe_allow_html=True)
+st.markdown("<hr><center style='color:#94a3b8;'>PaperPal 2.0 — FastAPI × Streamlit • 2026</center>", unsafe_allow_html=True)
