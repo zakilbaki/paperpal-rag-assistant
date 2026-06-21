@@ -1,85 +1,64 @@
-from __future__ import annotations  # must be first
+from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Optional
+
 import certifi
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo import AsyncMongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 
-# -------------------------------------------------------
-# 🧩 Config import (Render + Local compatible)
-# -------------------------------------------------------
-try:
-    # Local run (uvicorn app.main:app)
-    from app.core.config import settings
-except ModuleNotFoundError:
-    # Render container (starts at /app)
-    from app.core.config import settings
-
-# --- Global MongoDB clients ---
-_client: Optional[AsyncIOMotorClient] = None
-_db: Optional[AsyncIOMotorDatabase] = None
+from app.core.config import settings
 
 
-def get_client() -> AsyncIOMotorClient:
-    """
-    Return a singleton AsyncIOMotorClient using settings.MONGODB_URI.
-    Includes full TLS and CA file for MongoDB Atlas.
-    """
+logger = logging.getLogger(__name__)
+_client: Optional[AsyncMongoClient] = None
+_db = None
+
+
+def get_client() -> AsyncMongoClient:
+    """Return one Mongo client for the application process."""
     global _client
     if _client is None:
-        _client = AsyncIOMotorClient(
-            settings.MONGODB_URI,
-            uuidRepresentation="standard",
-            tls=True,                        # explicitly enable TLS
-            tlsAllowInvalidCertificates=False,
-            tlsCAFile=certifi.where(),        # ensures trusted CA
-            serverSelectionTimeoutMS=5000,    # 5s timeout for connection
-        )
+        options = {
+            "uuidRepresentation": "standard",
+            "serverSelectionTimeoutMS": 5_000,
+        }
+        if settings.MONGODB_URI.startswith("mongodb+srv://"):
+            options["tlsCAFile"] = certifi.where()
+        _client = AsyncMongoClient(settings.MONGODB_URI, **options)
     return _client
 
 
-def get_db() -> AsyncIOMotorDatabase:
-    """
-    Return the main application database instance.
-    """
+def get_db():
     global _db
     if _db is None:
-        client = get_client()
-        _db = client[settings.MONGODB_DB]
+        _db = get_client()[settings.MONGODB_DB]
     return _db
 
 
-async def get_database() -> AsyncIOMotorDatabase:
-    """
-    FastAPI dependency-compatible accessor for the DB.
-    Example:
-        @router.get("/items")
-        async def get_items(db=Depends(get_database)):
-            ...
-    """
+async def get_database():
     return get_db()
 
 
-# -------------------------------------------------------
-# 🧠 Health check with retry (Render-safe)
-# -------------------------------------------------------
-async def ping(max_retries: int = 5, delay_s: float = 2.0) -> bool:
-    """
-    Check MongoDB connection health with retry logic.
-    Returns True if 'ping' succeeds, False otherwise.
-    """
+async def close_client() -> None:
+    global _client, _db
+    if _client is not None:
+        await _client.close()
+    _client = None
+    _db = None
+
+
+async def ping(max_retries: int = 3, delay_s: float = 1.0) -> bool:
     client = get_client()
     for attempt in range(1, max_retries + 1):
         try:
-            res = await client.admin.command("ping")
-            if res.get("ok", 0) == 1:
-                print(f"[✅] MongoDB ping successful (attempt {attempt})")
+            response = await client.admin.command("ping")
+            if response.get("ok", 0) == 1:
                 return True
-        except ServerSelectionTimeoutError as e:
-            print(f"[⚠️] MongoDB ping timeout (attempt {attempt}/{max_retries}): {e}")
-        except Exception as e:
-            print(f"[❌] MongoDB ping failed (attempt {attempt}/{max_retries}): {e}")
+        except ServerSelectionTimeoutError:
+            logger.warning("MongoDB ping timed out (%s/%s)", attempt, max_retries)
+        except Exception:
+            logger.exception("MongoDB ping failed (%s/%s)", attempt, max_retries)
         await asyncio.sleep(delay_s)
-    print("[🚫] MongoDB ping failed after retries.")
     return False

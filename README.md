@@ -1,78 +1,119 @@
 # PaperPal
 
-RAG assistant for scientific PDFs with a FastAPI backend, Streamlit frontend, MongoDB storage, and Dockerized local deployment.
+[![CI](https://github.com/zakilbaki/paperpal-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/zakilbaki/paperpal-rag-assistant/actions/workflows/ci.yml)
 
-## Problem
+Scientific document intelligence application for uploading PDFs, generating concise
+summaries, extracting keywords, and comparing papers through a web interface.
 
-Reading long technical papers is slow, and plain LLM chat is unreliable on dense PDFs. PaperPal extracts content from uploaded papers, stores structured information, and answers questions through retrieval rather than generic generation.
+PaperPal combines a FastAPI service, Streamlit UI, MongoDB persistence, and a local
+Transformer summarizer. The complete stack runs with one Docker Compose command.
 
-## Input Source
+> **Scope note:** the current application is document intelligence, not a complete RAG
+> question-answering system. Retrieval-grounded chat is a roadmap item; the repository
+> does not claim that capability before an evaluated retrieval pipeline exists.
 
-- user-uploaded PDF papers
-- extracted text chunks and metadata
-- MongoDB collections for papers, chunks, and embeddings
+## Product workflow
 
-## Method
-
-- PDF upload and parsing
-- chunking and metadata extraction
-- embedding-based retrieval
-- API-first backend with FastAPI
-- Streamlit UI for upload and interaction
-- Docker and Render deployment configuration
-
-## Current Project Scope
-
-- PDF upload endpoint
-- summarization flow
-- keyword extraction flow
-- comparison-ready backend structure
-- containerized frontend/backend services
-
-## Results to Surface
-
-This repo already shows strong engineering scope, but it still needs clearer proof points. Add these before pinning:
-
-- supported document size and upload flow
-- example response quality on one sample paper
-- latency for upload and summary generation
-- one screenshot of the UI
-- one screenshot of the API docs
-
-## Project Structure
-
-```text
-paperpal-2/
-├── backend/
-│   ├── app/
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/
-│   ├── streamlit_app.py
-│   ├── Dockerfile
-│   └── requirements.txt
-├── docker-compose.yml
-├── render.yaml
-└── .env.example
+```mermaid
+flowchart LR
+    A[PDF upload] --> B[Text extraction]
+    B --> C[(MongoDB)]
+    C --> D[Transformer summarization]
+    C --> E[YAKE keywords]
+    C --> F[TF-IDF comparison]
+    D --> G[Streamlit UI]
+    E --> G
+    F --> G
 ```
 
-## How To Run
+| Capability | Implementation |
+| --- | --- |
+| PDF ingestion | Validated upload, 1 MB limit, PyMuPDF extraction |
+| Summarization | Lazy-loaded DistilBART, short/medium/detailed modes, Mongo cache |
+| Keywords | YAKE extraction with configurable `top_k` |
+| Comparison | Overall and section-level TF-IDF similarity, keyword overlap |
+| Persistence | Async MongoDB access through one shared client |
+| Delivery | FastAPI, Streamlit, Docker Compose, Render blueprint |
+
+## Run locally
+
+Requirements: Docker and Docker Compose. No cloud database or secret is required for
+the local stack.
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- Streamlit UI: `http://localhost:8501`
+- FastAPI docs: `http://localhost:8000/docs`
+- Health endpoint: `http://localhost:8000/api/v1/health/`
+
+MongoDB data is stored in the named `mongo_data` volume. The summarization model is
+downloaded on the first summary request rather than during API startup.
+
+To use MongoDB Atlas or another model, copy the environment template and override the
+defaults:
 
 ```bash
 cp .env.example .env
-docker-compose up --build
 ```
 
-Frontend: `http://localhost:8501`  
-Backend docs: `http://localhost:8000/docs`
+Never commit the resulting `.env` file.
 
-## Tech Stack
+## API example
 
-- Python
-- FastAPI
-- Streamlit
-- MongoDB
-- Docker
-- Render
+Upload a paper:
 
+```bash
+curl -X POST http://localhost:8000/api/v1/papers/upload \
+  -F 'file=@paper.pdf'
+```
 
+Generate a summary using the returned `paper_id`:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/papers/summarize \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "paper_id": "<paper_id>",
+    "summary_type": "medium",
+    "use_cache": true
+  }'
+```
+
+## Repository structure
+
+```text
+backend/
+  app/api/          FastAPI routes
+  app/core/         environment settings
+  app/db/           shared async Mongo connection
+  app/services/     parsing, summarization, keywords
+  tests/            dependency-light unit tests
+frontend/
+  streamlit_app.py  user interface
+docker-compose.yml  local backend, frontend, and MongoDB
+render.yaml         deployment blueprint
+```
+
+## Quality checks
+
+The lightweight unit suite covers deterministic text chunking and scientific-section
+parsing without downloading an ML model:
+
+```bash
+python -m pip install pytest pdfminer.six
+PYTHONPATH=backend pytest -q backend/tests
+```
+
+GitHub Actions runs the tests and compiles all Python sources on each pull request.
+
+## Current limitations
+
+- The 1 MB upload limit is intentionally conservative for CPU-only hosting.
+- Generated summaries still require human review; no factuality benchmark is claimed.
+- Scanned PDFs require OCR, which is not included yet.
+- Retrieval-grounded Q&A and retrieval evaluation are roadmap items.
+- Production deployment requires external MongoDB credentials and explicit CORS origins.

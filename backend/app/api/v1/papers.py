@@ -1,58 +1,24 @@
-from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
-from motor.motor_asyncio import AsyncIOMotorClient
 
-# -------------------------------------------------------
-# 🧩 Dual import pattern for local + Render environments
-# -------------------------------------------------------
-try:
-    from app.services.keywords import KeywordService  # local
-    from app.models.schemas import KeywordsRequest, KeywordsResponse
-    from app.core.config import settings
-except ModuleNotFoundError:
-    from app.services.keywords import KeywordService  # render
-    from app.models.schemas import KeywordsRequest, KeywordsResponse
-    from app.core.config import settings
+from app.db.mongo import get_database
+from app.models.schemas import KeywordsRequest, KeywordsResponse
+from app.services.keywords import KeywordService
 
-# -------------------------------------------------------
-# ⚙️ Router setup
-# -------------------------------------------------------
-router = APIRouter(tags=["papers"])  # ✅ no prefix; handled in main.py
 
-# -------------------------------------------------------
-# 🧩 Dependency: get database handle
-# -------------------------------------------------------
-async def get_db():
-    """Return an AsyncIOMotorDatabase instance."""
-    client = AsyncIOMotorClient(
-        settings.MONGODB_URI,
-        tls=True,
-        tlsAllowInvalidCertificates=False
-    )
-    return client[settings.MONGODB_DB]
+router = APIRouter(tags=["papers"])
 
-# -------------------------------------------------------
-# 🧠 Keyword Extraction Endpoint
-# -------------------------------------------------------
+
 @router.post("/keywords", response_model=KeywordsResponse)
-async def extract_keywords(
-    payload: KeywordsRequest,
-    db=Depends(get_db)
-):
-    """
-    Extract top keywords from a paper summary or full text.
-    Cached results are returned instantly if already stored in MongoDB.
-    """
+async def extract_keywords(payload: KeywordsRequest, db=Depends(get_database)):
+    """Extract and optionally cache YAKE keywords for one stored paper."""
     try:
-        service = KeywordService(db)
-        result = await service.extract(
+        result = await KeywordService(db).extract(
             paper_id=payload.paper_id,
             top_k=payload.top_k,
-            use_cache=payload.use_cache  # ✅ NEW
+            use_cache=payload.use_cache,
         )
         return KeywordsResponse(**result)
-
-    except ValueError as ve:
-        raise HTTPException(status_code=404, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Keyword extraction failed: {e}")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Keyword extraction failed") from exc

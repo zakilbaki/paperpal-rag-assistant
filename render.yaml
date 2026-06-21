@@ -1,36 +1,27 @@
 services:
-  # 🧠 Backend (FastAPI)
   - type: web
-    name: paperpal-backend1
-    env: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT   # ✅ Dynamic Render port
-    plan: free
+    name: paperpal-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health/
     envVars:
-      - key: APP_NAME
-        value: paperpal
       - key: APP_ENV
-        value: prod
-      - key: PORT
-        value: 10000                # ✅ helps local dev consistency
+        value: production
       - key: MONGODB_URI
-        sync: false                 # ✅ Secure: set manually in dashboard
+        sync: false
       - key: MONGODB_DB
         value: paperpal_db
       - key: FRONTEND_ORIGIN
-        value: https://paperpal-2-3.onrender.com   # ✅ must match actual frontend URL
+        sync: false
 
-  # 🎨 Frontend (Streamlit)
   - type: web
     name: paperpal-frontend
-    env: python
-    buildCommand: pip install -r frontend/requirements.txt
-    startCommand: streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0   # ✅ use dynamic port
-    plan: free
+    runtime: python
+    rootDir: frontend
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
     envVars:
       - key: BACKEND_BASE_URL
-        value: https://paperpal-backend1.onrender.com   # ✅ points to live backend
-      - key: API_PREFIX
-        value: /api/v1
-      - key: API_UPLOAD_ROUTE
-        value: /papers/upload
+        sync: false

@@ -1,19 +1,17 @@
-# Use lightweight Python image
 FROM python:3.11-slim
 
-# Set working directory inside container
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && useradd --create-home --uid 10001 appuser
 
-# Copy backend source code
-COPY app ./app
+COPY --chown=appuser:appuser app ./app
 
-# Expose port for Render
-ENV PORT=10000
-ENV PYTHONUNBUFFERED=1
+USER appuser
+EXPOSE 8000
 
-# Start FastAPI app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

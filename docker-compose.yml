@@ -1,31 +1,40 @@
-version: "3.9"
+name: paperpal
 
 services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - mongo_data:/data/db
+
   backend:
-    build:
-      context: ./backend
-    container_name: paperpal-backend
-    env_file:
-      - ./backend/.env
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MONGODB_DB: ${MONGODB_DB:-paperpal_db}
+      FRONTEND_ORIGIN: http://localhost:8501
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
-      - ./backend/.env:/app/.env    # ✅ make sure .env is visible inside the container
-    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
 
   frontend:
-    build:
-      context: ./frontend
-    container_name: paperpal-frontend
-    env_file:
-      - ./backend/.env
+    build: ./frontend
+    restart: unless-stopped
     environment:
-      - BACKEND_BASE_URL=http://backend:8000
+      BACKEND_BASE_URL: http://backend:8000
     ports:
       - "8501:8501"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-    restart: always   # ✅ fix typo (was "alway")
+
+volumes:
+  mongo_data:

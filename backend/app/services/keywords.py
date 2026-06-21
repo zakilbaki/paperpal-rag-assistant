@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Any, Optional
 import time
-from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from yake import KeywordExtractor
 
@@ -9,7 +8,7 @@ from yake import KeywordExtractor
 class KeywordService:
     """YAKE keyword extraction with Mongo caching and dynamic top_k."""
 
-    def __init__(self, db: AsyncIOMotorClient):
+    def __init__(self, db):
         # db should already be a Database instance (not a client)
         self.db = db
 
