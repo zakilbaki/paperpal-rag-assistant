@@ -33,7 +33,7 @@ flowchart LR
 | Keywords | YAKE extraction with configurable `top_k` |
 | Comparison | Overall and section-level TF-IDF similarity, keyword overlap |
 | Persistence | Async MongoDB access through one shared client |
-| Delivery | FastAPI, Streamlit, Docker Compose, Render blueprint |
+| Delivery | FastAPI, Streamlit, MongoDB, and Docker Compose |
 
 ## Run locally
 
@@ -95,7 +95,6 @@ backend/
 frontend/
   streamlit_app.py  user interface
 docker-compose.yml  local backend, frontend, and MongoDB
-render.yaml         deployment blueprint
 ```
 
 ## Quality checks
@@ -116,4 +115,5 @@ GitHub Actions runs the tests and compiles all Python sources on each pull reque
 - Generated summaries still require human review; no factuality benchmark is claimed.
 - Scanned PDFs require OCR, which is not included yet.
 - Retrieval-grounded Q&A and retrieval evaluation are roadmap items.
-- Production deployment requires external MongoDB credentials and explicit CORS origins.
+- A production deployment target is intentionally out of scope; the verified target is
+  the local Docker Compose stack.

@@ -11,5 +11,6 @@ yake==0.4.8
 numpy==2.0.2
 scikit-learn==1.5.2
 transformers>=4.44,<5
-torch>=2.4,<3
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.8.0+cpu
 psutil>=6,<8
