@@ -19,12 +19,17 @@ services:
       APP_ENV: development
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
       MONGODB_DB: ${MONGODB_DB:-paperpal_db}
+      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+      CHROMA_PATH: /data/chroma
+      CHROMA_COLLECTION: ${CHROMA_COLLECTION:-paperpal_chunks_v1}
       FRONTEND_ORIGIN: http://localhost:8501
     ports:
       - "8000:8000"
     depends_on:
       mongo:
         condition: service_healthy
+    volumes:
+      - chroma_data:/data/chroma
 
   frontend:
     build: ./frontend
@@ -38,3 +43,4 @@ services:
 
 volumes:
   mongo_data:
+  chroma_data:

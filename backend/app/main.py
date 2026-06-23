@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import compare, health, papers, summarize, upload
+from app.api.v1 import compare, health, papers, rag, summarize, upload
 from app.core.config import settings
 from app.db.mongo import close_client
 
@@ -36,6 +36,7 @@ app.include_router(papers.router, prefix="/api/v1/papers", tags=["Papers"])
 app.include_router(summarize.router, prefix="/api/v1/papers", tags=["Summarization"])
 app.include_router(compare.router, prefix="/api/v1/papers", tags=["Comparison"])
 app.include_router(upload.router, prefix="/api/v1/papers", tags=["Upload"])
+app.include_router(rag.router, prefix="/api/v1/papers", tags=["RAG indexing"])
 
 
 @app.get("/", tags=["Meta"])
