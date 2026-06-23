@@ -101,11 +101,11 @@ st.markdown("""
 # -----------------------------------------------------
 st.markdown("### Upload Your Paper")
 
-uploaded_file = st.file_uploader("Choose a PDF (max 1 MB)", type=["pdf"])
+uploaded_file = st.file_uploader("Choose a PDF (max 3 MB)", type=["pdf"])
 
 if uploaded_file:
-    if uploaded_file.size > 1 * 1024 * 1024:
-        st.error("File too large (limit 1 MB).")
+    if uploaded_file.size > 3 * 1024 * 1024:
+        st.error("File too large (limit 3 MB).")
         st.stop()
 
 @st.cache_data(show_spinner=False)
