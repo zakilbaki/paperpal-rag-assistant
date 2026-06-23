@@ -101,7 +101,7 @@ experimental scaffolding as a product feature.
 | Decision | Current recommendation | Status |
 | --- | --- | --- |
 | Answer generation | Optional API provider with retrieval-only fallback | Requires approval |
-| Reranking | Exclude from the first version | Requires approval |
+| Model-based reranking | Evaluate only after the lightweight reranker is measured | Requires approval |
 | Retrieval evaluation | Human-labelled questions with expected pages or chunks | Requires real papers |
 | Retriever fine-tuning | Postpone until a measured baseline exists | Requires approval |
 
@@ -118,8 +118,10 @@ idempotent.
 The retrieval endpoint accepts a question for one indexed paper and a configurable
 `top_k` between 1 and 10, defaulting to 5. It embeds the question with the same MiniLM
 model, filters Chroma strictly by `paper_id`, converts cosine distance to similarity,
-and hydrates the ranked chunk IDs from MongoDB. Results include text, score, page,
-nullable section metadata, and character offsets.
+retrieves a broader candidate pool, and hydrates candidate chunk IDs from MongoDB.
+Results include text, a final reranked score, the original vector score, a lightweight
+keyword score, original vector rank, page, nullable section metadata, and character
+offsets.
 
 The server always filters by `paper_id` and `index_version`; retrieval searches all
 indexed chunks in the selected paper. Section metadata remains nullable in the API for a
@@ -132,10 +134,27 @@ must be calibrated on representative answerable and unanswerable questions.
 Answer generation and RAG evaluation are not yet implemented. The retrieval endpoint
 returns ranked evidence rather than presenting that evidence as a generated answer.
 
+## Implemented Lightweight Reranking
+
+The retrieval pipeline now requests up to 20 vector candidates by default
+(`RAG_RETRIEVAL_CANDIDATES`) before returning the requested `top_k` results. A deterministic
+reranker combines the Chroma vector similarity with a transparent keyword-coverage score
+based on meaningful question terms. The current blend is 60% vector similarity and 40%
+keyword coverage, selected after a five-question *Attention Is All You Need* comparison
+improved MRR@5 from 0.607 to 0.707 versus the initial 75/25 blend. The final `score` is
+the blended rerank score. `vector_score`, `keyword_score`, and `vector_rank` are returned
+so the ranking remains inspectable.
+
+This is intentionally not a cross-encoder or LLM reranker. It adds no model download,
+keeps CI lightweight, and gives the project a measurable reranking seam. Its purpose is
+to test whether broad candidate retrieval plus a cheap direct-match signal improves the
+known failure cases where relevant chunks appear below noisy references or tables.
+Real-paper metrics must be rerun before claiming retrieval-quality improvement.
+
 ## Implemented Context Builder
 
 The retrieval endpoint now also returns a deterministic context packet for the future
-answer model. It processes the ranked top-five results without another model call or a
+answer model. It processes the reranked top results without another model call or a
 similarity threshold. Chunks are merged only when their exact page-local character
 ranges overlap and their page and section metadata match. Each resulting passage has a
 stable citation label (`C1`, `C2`, ...), retains every contributing chunk ID, and includes

@@ -8,6 +8,7 @@ from bson import ObjectId
 from app.core.config import settings
 from app.rag.context import build_context
 from app.rag.interfaces import EmbeddingProvider, VectorSearchFilters, VectorStore
+from app.rag.reranking import rerank_chunks
 
 
 class PaperNotIndexedError(RuntimeError):
@@ -51,7 +52,7 @@ async def retrieve_chunks(
             index_version=settings.RAG_INDEX_VERSION,
         ),
         vectors[0],
-        top_k,
+        max(top_k, settings.RAG_RETRIEVAL_CANDIDATES),
     )
 
     chunk_ids = [match.chunk_id for match in matches]
@@ -64,12 +65,12 @@ async def retrieve_chunks(
         documents = await cursor.to_list(length=len(chunk_ids))
     documents_by_id = {str(document["_id"]): document for document in documents}
 
-    results = []
+    candidates = []
     for match in matches:
         document = documents_by_id.get(match.chunk_id)
         if not document:
             continue
-        results.append(
+        candidates.append(
             {
                 "chunk_id": match.chunk_id,
                 "text": document["text"],
@@ -80,6 +81,7 @@ async def retrieve_chunks(
                 "end_char": document["end_char"],
             }
         )
+    results = rerank_chunks(question, candidates, top_k)
 
     context = build_context(
         results,
