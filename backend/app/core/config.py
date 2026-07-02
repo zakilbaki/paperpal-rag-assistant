@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     RAG_INDEX_VERSION: str = "minilm-v2"
     RAG_CHUNK_TOKENS: int = 220
     RAG_CHUNK_OVERLAP: int = 40
+    RAG_RETRIEVAL_CANDIDATES: int = 20
     RAG_CONTEXT_MAX_TOKENS: int = 1200
     RAG_CONTEXT_MAX_PASSAGES: int = 5
     FRONTEND_ORIGIN: str = "http://localhost:8501"

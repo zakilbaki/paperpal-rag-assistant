@@ -18,6 +18,9 @@ class RagRetrievedChunk(BaseModel):
     chunk_id: str
     text: str
     score: float
+    vector_score: float | None = None
+    keyword_score: float | None = None
+    vector_rank: int | None = None
     page: int | None = None
     section: str | None = None
     start_char: int

@@ -91,7 +91,7 @@ def indexed_paper(paper_id):
     }
 
 
-def test_retrieve_chunks_hydrates_mongodb_in_vector_ranking_order() -> None:
+def test_retrieve_chunks_hydrates_mongodb_and_expands_candidate_pool() -> None:
     paper_id = ObjectId()
     database = FakeDatabase(
         indexed_paper(paper_id),
@@ -139,11 +139,59 @@ def test_retrieve_chunks_hydrates_mongodb_in_vector_ranking_order() -> None:
     assert result["results"][0]["page"] == 2
     assert vector_store.search_call[0].paper_id == str(paper_id)
     assert vector_store.search_call[0].index_version == settings.RAG_INDEX_VERSION
-    assert vector_store.search_call[2] == 5
+    assert vector_store.search_call[2] == settings.RAG_RETRIEVAL_CANDIDATES
     assert database.chunks.last_query["paper_id"] == paper_id
+    assert result["results"][0]["score"] <= result["results"][0]["vector_score"]
+    assert result["results"][0]["vector_rank"] == 1
     assert result["context"]["evidence_available"] is True
     assert [item["citation"] for item in result["context"]["evidence"]] == ["C1", "C2"]
     assert result["context"]["evidence"][0]["source_chunk_ids"] == ["first"]
+
+
+def test_retrieve_chunks_reranks_expanded_candidates_before_returning_top_k() -> None:
+    paper_id = ObjectId()
+    documents = [
+        {
+            "_id": "high-vector",
+            "paper_id": paper_id,
+            "text": "References and unrelated bibliography.",
+            "page": 10,
+            "section": None,
+            "start_char": 900,
+            "end_char": 940,
+        },
+        {
+            "_id": "direct-answer",
+            "paper_id": paper_id,
+            "text": "The method used transformer attention layers.",
+            "page": 3,
+            "section": None,
+            "start_char": 200,
+            "end_char": 245,
+        },
+    ]
+    vector_store = FakeVectorStore(
+        [
+            VectorSearchResult("high-vector", 0.85),
+            VectorSearchResult("direct-answer", 0.60),
+        ]
+    )
+    database = FakeDatabase(indexed_paper(paper_id), documents)
+
+    result = asyncio.run(
+        retrieve_chunks(
+            database,
+            paper_id,
+            "What method was used?",
+            1,
+            FakeEmbeddingProvider(),
+            vector_store,
+        )
+    )
+
+    assert [item["chunk_id"] for item in result["results"]] == ["direct-answer"]
+    assert result["results"][0]["vector_rank"] == 2
+    assert result["results"][0]["keyword_score"] > 0
 
 
 def test_retrieve_chunks_rejects_unindexed_paper() -> None:

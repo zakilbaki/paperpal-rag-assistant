@@ -39,7 +39,7 @@ flowchart LR
 | Keywords | YAKE extraction with configurable `top_k` |
 | Comparison | Overall and section-level TF-IDF similarity, keyword overlap |
 | RAG indexing | Experimental page-aware chunks in MongoDB and MiniLM vectors in ChromaDB |
-| RAG retrieval | Experimental single-paper top-k passages with scores and citation metadata |
+| RAG retrieval | Experimental single-paper candidate expansion, lightweight reranking, scores, and citation metadata |
 | Context building | Overlap-aware evidence packet with stable citations and a token budget |
 | Persistence | Async MongoDB access through one shared client |
 | Delivery | FastAPI, Streamlit, MongoDB, and Docker Compose |
@@ -113,7 +113,7 @@ backend/
   app/api/          FastAPI routes
   app/core/         environment settings
   app/db/           shared async Mongo connection
-  app/rag/          chunking, embeddings, retrieval, context building, Chroma adapter
+  app/rag/          chunking, embeddings, reranking, retrieval, context building, Chroma adapter
   app/services/     parsing, summarization, keywords
   tests/            dependency-light unit tests
 frontend/
@@ -134,3 +134,14 @@ PYTHONPATH=backend pytest -q backend/tests
 
 GitHub Actions runs the tests and compiles all Python sources on each pull request.
 
+## Current limitations
+
+- The 3 MB upload limit is intentionally conservative for CPU-only hosting.
+- Generated summaries still require human review; no factuality benchmark is claimed.
+- Scanned PDFs require OCR, which is not included yet.
+- Answer generation, relevance-threshold calibration, model-based reranking, and broader
+  retrieval evaluation remain roadmap items; the current endpoint returns ranked evidence
+  only. Preliminary real-paper retrieval results are documented in the architecture
+  decision record.
+- A production deployment target is intentionally out of scope; the verified target is
+  the local Docker Compose stack.
