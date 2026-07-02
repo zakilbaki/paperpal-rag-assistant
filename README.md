@@ -134,13 +134,3 @@ PYTHONPATH=backend pytest -q backend/tests
 
 GitHub Actions runs the tests and compiles all Python sources on each pull request.
 
-## Current limitations
-
-- The 3 MB upload limit is intentionally conservative for CPU-only hosting.
-- Generated summaries still require human review; no factuality benchmark is claimed.
-- Scanned PDFs require OCR, which is not included yet.
-- Answer generation, relevance-threshold calibration, and broader retrieval evaluation
-  remain roadmap items; the current endpoint returns ranked evidence only. Preliminary
-  real-paper retrieval results are documented in the architecture decision record.
-- A production deployment target is intentionally out of scope; the verified target is
-  the local Docker Compose stack.
