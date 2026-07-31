@@ -8,9 +8,6 @@ summaries, extracting keywords, and comparing papers through a web interface.
 PaperPal combines a FastAPI service, Streamlit UI, MongoDB persistence, and a local
 Transformer summarizer. The complete stack runs with one Docker Compose command.
 
-> **Scope note:** the current application is document intelligence, not a complete RAG
-> question-answering system. Retrieval-grounded chat is a roadmap item; the repository
-> does not claim that capability before an evaluated retrieval pipeline exists.
 
 The decisions and preliminary experiments guiding that roadmap are recorded in
 [`docs/rag-architecture-decisions.md`](docs/rag-architecture-decisions.md).
