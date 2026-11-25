@@ -1,0 +1,13 @@
+flowchart TD
+    UI["Streamlit"] --> API["FastAPI"]
+    API --> PDF["PDF extraction"]
+    PDF --> DB[("MongoDB documents")]
+    DB --> S["Summaries and keywords"]
+    DB --> X["Document comparison"]
+    DB --> C["Page-aware chunks"]
+    C --> E["MiniLM embeddings"]
+    E --> V[("ChromaDB")]
+    Q["Question and paper ID"] --> R["Candidate retrieval"]
+    V --> R
+    R --> RR["Semantic and lexical reranking"]
+    RR --> CTX["Cited context packet"]

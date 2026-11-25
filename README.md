@@ -1,133 +1,121 @@
-# PaperPal
+# PaperPal: RAG for Scientific Papers
 
-[![CI](https://github.com/zakilbaki/paperpal-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/zakilbaki/paperpal-rag-assistant/actions/workflows/ci.yml)
+A scientific-document **RAG project** built around semantic retrieval, lexical reranking, and **page-linked citation context**. Questions are matched to evidence from indexed papers, with source identifiers and token budgets preserved throughout the retrieval pipeline.
 
-Scientific document intelligence application for uploading PDFs, generating concise
-summaries, extracting keywords, and comparing papers through a web interface.
+**Stack:** MiniLM · Chroma · MongoDB · FastAPI · Streamlit · PyMuPDF
 
-PaperPal combines a FastAPI service, Streamlit UI, MongoDB persistence, and a local
-Transformer summarizer. The complete stack runs with one Docker Compose command.
+The AI engineering focus is the path from a scientific PDF to **retrievable, ranked, citation-ready evidence**: page-aware chunking, dense embeddings, semantic search, lexical reranking, and context construction. The research-chat demonstration shows how that evidence supports document-grounded interaction.
 
+[Portfolio case study](https://zakilbaki.github.io/Zakaria_Ouahabi/) · [RAG design and evaluation](docs/rag-architecture-decisions.md)
 
-The decisions and preliminary experiments guiding that roadmap are recorded in
-[`docs/rag-architecture-decisions.md`](docs/rag-architecture-decisions.md).
+## Research-chat walkthrough
 
-## Product workflow
+The portfolio presents a chatbot interface alongside the passages supporting its responses. The demonstrations describe that case-study experience; the local setup below runs the document-processing and retrieval implementation in this repository.
 
-```mermaid
-flowchart LR
-    A[PDF upload] --> B[Text extraction]
-    B --> C[(MongoDB)]
-    C --> H[Page-aware chunks]
-    H --> I[MiniLM embeddings]
-    I --> J[(ChromaDB)]
-    C --> D[Transformer summarization]
-    C --> E[YAKE keywords]
-    C --> F[TF-IDF comparison]
-    D --> G[Streamlit UI]
-    E --> G
-    F --> G
-```
+![PaperPal research chat and supporting passages from the portfolio](docs/assets/paperpal-chatbot.png)
 
-| Capability | Implementation |
+[Watch the chatbot demonstration](https://raw.githubusercontent.com/zakilbaki/Zakaria_Ouahabi/main/assets/visuals/paperpal/paperpal-chatbot.gif) · [Watch the document workflow](https://raw.githubusercontent.com/zakilbaki/Zakaria_Ouahabi/main/assets/visuals/paperpal/paperpal-workflow.gif) · [Document library](docs/assets/paperpal-library.png)
+
+## RAG pipeline
+
+![Technical architecture](docs/assets/architecture.svg)
+
+[Diagram source](docs/visuals/visual_spec.json)
+
+The implemented retrieval path returns passages and citation context. The document record remains the shared source for summaries, comparison, and indexing.
+
+| RAG stage | Implementation |
 | --- | --- |
-| PDF ingestion | Validated upload, 3 MB limit, PyMuPDF extraction |
-| Summarization | Lazy-loaded DistilBART, short/medium/detailed modes, Mongo cache |
-| Keywords | YAKE extraction with configurable `top_k` |
-| Comparison | Overall and section-level TF-IDF similarity, keyword overlap |
-| RAG indexing | Experimental page-aware chunks in MongoDB and MiniLM vectors in ChromaDB |
-| RAG retrieval | Experimental single-paper candidate expansion, lightweight reranking, scores, and citation metadata |
-| Context building | Overlap-aware evidence packet with stable citations and a token budget |
-| Persistence | Async MongoDB access through one shared client |
-| Delivery | FastAPI, Streamlit, MongoDB, and Docker Compose |
+| Parse and preserve provenance | PyMuPDF page text and character offsets in MongoDB |
+| Chunk | Page-aware, sentence-aware chunks: 220 tokens, 40-token overlap |
+| Embed and index | MiniLM embeddings and persistent Chroma storage |
+| Retrieve | Filter by paper and index version; up to 20 vector candidates |
+| Rerank | 60% vector similarity and 40% lexical coverage |
+| Build context | Merge overlapping spans; retain chunk IDs and stable citation labels |
+| Control context size | Up to five passages within a 1,200-token budget |
+
+Indexing and question answering use separate paths. Indexing persists the document's chunks and embeddings once; each question is embedded, searched against the selected paper, reranked, and assembled into a bounded evidence packet. The retrieval response exposes vector and lexical scores alongside page offsets and source chunk IDs, so the selected context can be inspected.
+
+[Chunking](backend/app/rag/chunking.py) · [Retrieval](backend/app/rag/retrieval.py) · [Reranking](backend/app/rag/reranking.py) · [Context construction](backend/app/rag/context.py)
+
+## Recorded retrieval study
+
+The documented experiment uses **three scientific papers, 57 pages, and 332 chunks**, with 18 labelled answerable questions and six unsupported questions.
+
+| Metric on answerable questions | Recorded result |
+| --- | ---: |
+| Page Recall@1 | 0.778 |
+| Page Recall@3 | 0.944 |
+| Page Recall@5 | 1.000 |
+| MRR@10 | 0.854 |
+
+These are results from the small recorded retrieval experiment, not generated-answer accuracy. The [design and evaluation record](docs/rag-architecture-decisions.md) gives the corpus, stage-specific experiments, and context-budget checks.
+
+## Reading tools
+
+The same document store also supports local DistilBART summaries, YAKE keywords, and overall or section-level TF-IDF comparisons.
+
+| Summarize a paper | Compare methods |
+| --- | --- |
+| ![Summary view](docs/assets/paperpal-summary.png) | ![Comparison view](docs/assets/paperpal-compare.png) |
+
+The summarization route processes up to eight chunks per request; use the source PDF for complete coverage of longer documents.
 
 ## Run locally
 
-Requirements: Docker and Docker Compose. No cloud database or secret is required for
-the local stack.
+With Docker and Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
-Open:
+| Service | Local address |
+| --- | --- |
+| Reading interface | http://localhost:8501 |
+| API documentation | http://localhost:8000/docs |
+| Health endpoint | http://localhost:8000/api/v1/health/ |
 
-- Streamlit UI: `http://localhost:8501`
-- FastAPI docs: `http://localhost:8000/docs`
-- Health endpoint: `http://localhost:8000/api/v1/health/`
+The default stack uses local MongoDB and Chroma volumes. Model weights download on first use. The Compose configuration defines the available environment settings; `.env.example` documents optional overrides.
 
-MongoDB and ChromaDB data are stored in the named `mongo_data` and `chroma_data`
-volumes. Models are downloaded lazily on the first operation that requires them.
+## API workflow
 
-To use MongoDB Atlas or another model, copy the environment template and override the
-defaults:
-
-```bash
-cp .env.example .env
-```
-
-Never commit the resulting `.env` file.
-
-## API example
-
-Upload a paper:
+Upload a PDF:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/papers/upload \
   -F 'file=@paper.pdf'
 ```
 
-Generate a summary using the returned `paper_id`:
+Use its returned document identifier as `PAPER_ID`, then index and query it:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/papers/summarize \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "paper_id": "<paper_id>",
-    "summary_type": "medium",
-    "use_cache": true
-  }'
-```
+curl -X POST "http://localhost:8000/api/v1/papers/${PAPER_ID}/rag/index"
 
-Create or replace the retrieval index for that paper:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/papers/<paper_id>/rag/index
-```
-
-Retrieve cited passages from that paper:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/papers/<paper_id>/rag/retrieve \
+curl -X POST "http://localhost:8000/api/v1/papers/${PAPER_ID}/rag/retrieve" \
   -H 'Content-Type: application/json' \
   -d '{"question":"What method was used?","top_k":5}'
 ```
 
-## Repository structure
+Retrieval returns ranked passages, source metadata, and a bounded context packet. Index version and embedding identity are checked before querying.
 
-```text
-backend/
-  app/api/          FastAPI routes
-  app/core/         environment settings
-  app/db/           shared async Mongo connection
-  app/rag/          chunking, embeddings, reranking, retrieval, context building, Chroma adapter
-  app/services/     parsing, summarization, keywords
-  tests/            dependency-light unit tests
-frontend/
-  streamlit_app.py  user interface
-docker-compose.yml  local app, MongoDB, and persistent Chroma storage
-```
+## Engineering decisions
 
-## Quality checks
+- **Shared document storage:** reading tools use the same persisted document rather than independently extracting each PDF.
 
-The lightweight unit suite covers deterministic RAG chunking and the legacy PDF section
-parser without downloading an ML model:
+- **Separate text and vector storage:** MongoDB retains content and provenance; Chroma supports similarity search.
 
-```bash
-python -m pip install pytest fastapi httpx pydantic-settings pymongo certifi \
-  python-multipart PyMuPDF yake numpy scikit-learn pdfminer.six psutil
-PYTHONPATH=backend pytest -q backend/tests
-```
+- **Inspectable reranking:** a 60% vector and 40% lexical score combines semantic retrieval with explicit query-term coverage.
 
-GitHub Actions runs the tests and compiles all Python sources on each pull request.
+- **Bounded context:** the default evidence packet allows five passages and a 1,200-token budget.
 
+## Repository guide
+
+| Path | Contents |
+| --- | --- |
+| `backend/app/api/v1/` | Upload, summary, comparison, and retrieval routes |
+| `backend/app/rag/` | Chunking, indexing, retrieval, reranking, and context |
+| `backend/app/services/` | Parsing, keywords, and summarization |
+| `backend/tests/` | API and deterministic processing tests |
+| `frontend/streamlit_app.py` | Reading interface |
+
+The dependency setup and test command are recorded in [.github/workflows/ci.yml](.github/workflows/ci.yml). The [retrieval design record](docs/rag-architecture-decisions.md) explains the implementation in more detail.

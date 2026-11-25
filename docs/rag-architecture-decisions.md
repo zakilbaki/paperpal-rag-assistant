@@ -1,207 +1,38 @@
-# PaperPal RAG Architecture Decisions
+# Document retrieval design
 
-## Purpose
+PaperPal separates durable document records, a rebuildable vector index, and deterministic evidence assembly. This document describes the implementation in this repository and the recorded experiments supporting its design.
 
-This document records the reasoning and preliminary experiments used to design
-PaperPal's retrieval-augmented generation roadmap. It distinguishes approved decisions
-from recommendations that still require validation. The current application remains a
-document-intelligence system with indexing and retrieval foundations; this record does
-not claim that answer generation is implemented.
+## Document storage and indexing
 
-## Existing Baseline
+MongoDB stores paper text, page boundaries, summaries, keywords, complete chunks, and citation metadata. Chroma stores normalized embeddings, chunk and paper identifiers, index version, and retrieval metadata in a persistent Docker volume.
 
-PaperPal currently extracts PDF text, stores papers in MongoDB, generates summaries,
-extracts keywords, and compares papers. MongoDB is accessed through a shared asynchronous
-client, and the complete local application runs through Docker Compose.
+The indexer uses page-aware, sentence-aware chunks with a 220-token limit and 40-token overlap. It preserves character offsets. Deterministic chunk identifiers and replacement of previous records make re-indexing idempotent.
 
-## Approved Decisions
+The embedding model is `sentence-transformers/all-MiniLM-L6-v2`, producing 384-dimensional vectors. Its effective 256-word-piece input limit constrains chunk size. Changing the embedding model requires rebuilding the index.
 
-### MongoDB remains the source of truth
+Section metadata is nullable. The baseline does not infer or filter by section because heading heuristics varied across scientific papers.
 
-MongoDB will continue to store paper text, metadata, summaries, keywords, future RAG
-chunks, citation metadata, and question-and-answer history. Semantic retrieval will use
-a separate vector index containing embeddings, chunk IDs, paper IDs, and only the
-metadata required for filtering.
+## Retrieval and reranking
 
-This separation keeps application records durable and inspectable while allowing the
-retrieval index to be rebuilt when the embedding model or chunking strategy changes.
+A request identifies one paper and supplies a question. The same MiniLM model embeds the question. Chroma filters by `paper_id` and `index_version`, returning up to 20 vector candidates by default. MongoDB supplies the complete passages for those chunk identifiers.
 
-### Initial embedding model: all-MiniLM-L6-v2
+A deterministic reranker combines **60% vector similarity and 40% lexical coverage** of meaningful question terms. The API returns the blended score alongside `vector_score`, `keyword_score`, and `vector_rank`. The final `top_k` ranges from 1 to 10, defaulting to 5.
 
-The initial retrieval implementation will use
-`sentence-transformers/all-MiniLM-L6-v2`. It runs locally, requires no API key, produces
-compact 384-dimensional vectors, and was faster than BGE-small in the preliminary local
-experiment. Both candidates retrieved all expected passages in that experiment, so
-speed and implementation simplicity were the differentiators rather than measured
-retrieval-quality superiority.
+The 60/40 blend followed a five-question *Attention Is All You Need* comparison in which MRR@5 increased from 0.607 to 0.707 relative to a 75/25 blend. This is a small selection experiment, not an independent retrieval benchmark.
 
-MiniLM's effective input limit is approximately 256 word-piece tokens. PaperPal must
-therefore avoid the previously considered 500-token chunks. The initial chunking target
-is 200–220 tokens with 30–40 tokens of overlap, while preserving sentence and page
-boundaries where possible. Section inference is intentionally not part of the RAG
-baseline because heading heuristics proved brittle across papers and domains.
+## Citation context
 
-Changing the embedding model later will require a complete vector-index rebuild. The
-model ID and index version must be stored with indexing metadata.
+The context builder merges chunks only when their exact page-local character ranges overlap and their page and section metadata match. It assigns stable citation labels, retains contributing chunk IDs and offsets, and records passage scores.
 
-### Local persistent vector store: ChromaDB
+The default budget is **five passages and 1,200 MiniLM tokenizer tokens**, including citation headers. `evidence_available` means that usable text was returned. It does not establish that the passages answer the question.
 
-ChromaDB is approved as PaperPal's initial vector store. MongoDB stores complete chunks
-and citation metadata; Chroma stores normalized MiniLM embeddings, `chunk_id`, `paper_id`,
-the index version, and minimal filter metadata. Chroma is persisted through a dedicated
-Docker volume and can be reconstructed entirely from MongoDB.
+This endpoint returns cited context. Generated-answer correctness is a separate evaluation question.
 
-The adapter is hidden behind a `VectorStore` interface. This keeps Atlas Vector Search or
-another backend possible later without rewriting chunking or application persistence.
-Embedded Chroma is appropriate for the current single-backend local deployment; a
-multi-instance deployment would require server-mode or managed vector infrastructure.
+## Recorded retrieval evaluation
 
-## Preliminary Embedding Experiment
+The documented evaluation used the original [Transformer](https://arxiv.org/abs/1706.03762), [BERT](https://arxiv.org/abs/1810.04805), and [LoRA](https://arxiv.org/abs/2106.09685) papers: 57 PDF pages, 332 chunks, 18 labelled answerable questions, and six unsupported questions.
 
-### Question
-
-Could MiniLM or `BAAI/bge-small-en-v1.5` provide a viable local retrieval baseline before
-choosing the production vector store?
-
-### Method
-
-- Twelve original synthetic scientific passages covered distinct technical subjects.
-- Twelve answerable and three unanswerable questions were evaluated.
-- Each model embedded the same passages and questions on CPU.
-- Exact cosine similarity ranked every passage, avoiding vector-store configuration as
-  a confounding variable.
-- Recall@1, Recall@3, Recall@5, mean reciprocal rank, and execution time were recorded.
-
-### Results
-
-| Model | Recall@1 | Recall@3 | Recall@5 | MRR | Index time | Query time |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| MiniLM-L6-v2 | 1.000 | 1.000 | 1.000 | 1.000 | 0.045 s | 0.017 s |
-| BGE-small-en-v1.5 | 1.000 | 1.000 | 1.000 | 1.000 | 0.061 s | 0.036 s |
-
-Times came from one small local cached-model run and are not production benchmarks.
-Both models achieved perfect retrieval, showing that both are viable but also that the
-synthetic corpus was too easy to establish a retrieval-quality winner. Raw cosine scores
-from different embedding models are not directly comparable and cannot define a shared
-relevance threshold.
-
-### Interpretation
-
-MiniLM was selected as the simpler and faster initial baseline, not because the experiment
-proved it retrieves scientific evidence better. The choice must be revisited if evaluation
-on representative papers shows inadequate recall or if longer chunks are necessary.
-
-The temporary benchmark implementation, generated reports, synthetic dataset, model
-downloads, and benchmark-specific tests are intentionally excluded from the final
-repository. This decision record preserves the method and evidence without shipping
-experimental scaffolding as a product feature.
-
-## Decisions Still Pending
-
-| Decision | Current recommendation | Status |
-| --- | --- | --- |
-| Answer generation | Optional API provider with retrieval-only fallback | Requires approval |
-| Model-based reranking | Evaluate only after the lightweight reranker is measured | Requires approval |
-| Retrieval evaluation | Human-labelled questions with expected pages or chunks | Requires real papers |
-| Retriever fine-tuning | Postpone until a measured baseline exists | Requires approval |
-
-## Implemented Indexing Slice
-
-PaperPal now preserves page text and character offsets during upload. The indexing
-endpoint creates page-aware, sentence-aware, MiniLM-sized chunks, stores their complete
-records in MongoDB, and replaces the paper's vectors in persistent Chroma. Chunk
-identifiers are deterministic and the operation removes previous records, making retries
-idempotent.
-
-## Implemented Retrieval Slice
-
-The retrieval endpoint accepts a question for one indexed paper and a configurable
-`top_k` between 1 and 10, defaulting to 5. It embeds the question with the same MiniLM
-model, filters Chroma strictly by `paper_id`, converts cosine distance to similarity,
-retrieves a broader candidate pool, and hydrates candidate chunk IDs from MongoDB.
-Results include text, a final reranked score, the original vector score, a lightweight
-keyword score, original vector rank, page, nullable section metadata, and character
-offsets.
-
-The server always filters by `paper_id` and `index_version`; retrieval searches all
-indexed chunks in the selected paper. Section metadata remains nullable in the API for a
-future robust parser, but the current RAG baseline does not infer or filter by sections.
-
-Retrieval is intentionally limited to one paper in the first version to keep provenance
-and evaluation clear. No fixed relevance threshold is applied yet because MiniLM scores
-must be calibrated on representative answerable and unanswerable questions.
-
-Answer generation and RAG evaluation are not yet implemented. The retrieval endpoint
-returns ranked evidence rather than presenting that evidence as a generated answer.
-
-## Implemented Lightweight Reranking
-
-The retrieval pipeline now requests up to 20 vector candidates by default
-(`RAG_RETRIEVAL_CANDIDATES`) before returning the requested `top_k` results. A deterministic
-reranker combines the Chroma vector similarity with a transparent keyword-coverage score
-based on meaningful question terms. The current blend is 60% vector similarity and 40%
-keyword coverage, selected after a five-question *Attention Is All You Need* comparison
-improved MRR@5 from 0.607 to 0.707 versus the initial 75/25 blend. The final `score` is
-the blended rerank score. `vector_score`, `keyword_score`, and `vector_rank` are returned
-so the ranking remains inspectable.
-
-This is intentionally not a cross-encoder or LLM reranker. It adds no model download,
-keeps CI lightweight, and gives the project a measurable reranking seam. Its purpose is
-to test whether broad candidate retrieval plus a cheap direct-match signal improves the
-known failure cases where relevant chunks appear below noisy references or tables.
-Real-paper metrics must be rerun before claiming retrieval-quality improvement.
-
-## Implemented Context Builder
-
-The retrieval endpoint now also returns a deterministic context packet for the future
-answer model. It processes the reranked top results without another model call or a
-similarity threshold. Chunks are merged only when their exact page-local character
-ranges overlap and their page and section metadata match. Each resulting passage has a
-stable citation label (`C1`, `C2`, ...), retains every contributing chunk ID, and includes
-page, nullable section metadata, score, and character offsets.
-
-The packet is capped at five passages and 1,200 MiniLM tokenizer tokens, including the
-citation headers. It exposes `evidence_available`, which means only that retrieval
-returned usable text. It deliberately does not claim that the evidence answers the
-question; the unsupported-question experiment showed that cosine similarity cannot make
-that decision safely. A future answer model must use its own tokenizer to validate the
-final prompt budget.
-
-The builder was evaluated with the same 24 real-paper questions used for retrieval:
-
-| Context metric | Result |
-| --- | ---: |
-| Relevant-page retention (18 answerable questions) | 1.000 |
-| Raw top-five source chunks | 120 |
-| Resulting cited passages after overlap merging | 101 |
-| Source chunks retained in cited passages | 120 |
-| Mean context size | 859.4 tokens |
-| Maximum context size | 1,073 tokens |
-| Contexts exceeding 1,200 tokens | 0 |
-
-This validates provenance preservation and budget enforcement on the current corpus; it
-does not evaluate generated-answer correctness. Unsupported questions still receive a
-context packet because no reliable abstention mechanism has been approved yet.
-
-## Required Production Evaluation
-
-Before claiming retrieval quality, PaperPal should be evaluated with three to five
-representative scientific PDFs and at least twenty human-labelled questions. Expected
-evidence should identify the relevant paper, page, or chunk. The evaluation
-should report Recall@k, mean reciprocal rank, citation validity, latency, and behavior on
-questions unsupported by the documents.
-
-## Real-Paper Retrieval Evaluation
-
-A preliminary production-pipeline evaluation used three original arXiv papers:
-[Attention Is All You Need](https://arxiv.org/abs/1706.03762),
-[BERT](https://arxiv.org/abs/1810.04805), and
-[LoRA](https://arxiv.org/abs/2106.09685). The corpus contained 57 PDF pages and produced
-332 chunks using the configured 220-token limit and 40-token overlap. Eighteen
-human-labelled answerable questions and six document-unsupported questions were run
-through the actual MiniLM and persistent Chroma implementation.
-
-| Metric | Aggregate result |
+| Metric | Recorded result |
 | --- | ---: |
 | Page Recall@1 | 0.778 |
 | Page Recall@3 | 0.944 |
@@ -211,88 +42,52 @@ through the actual MiniLM and persistent Chroma implementation.
 | Mean warm query latency | 7.1 ms |
 | P95 warm query latency | 7.7 ms |
 
-Per-paper Page Recall@1 was 0.833 for Transformer, 0.833 for BERT, and 0.667 for LoRA.
-Every labelled question found a relevant page within the first five chunks. Four questions
-needed more than the first result, with BERT task-specific architecture requiring rank
-five. These cases motivate keeping `top_k=5` and later testing reranking or hybrid
-retrieval rather than assuming the first chunk is always sufficient.
+Page Recall@1 was 0.833 for Transformer, 0.833 for BERT, and 0.667 for LoRA. One BERT question required rank five. These measurements come from the recorded local experiment; the labelled questions, temporary index, and evaluation script are not committed, so they are not an independently rerunnable benchmark package.
 
-Similarity scores did not cleanly separate answerable from unsupported questions.
-Answerable top-1 scores ranged from 0.395 upward, while an unsupported BERT question
-scored 0.711. A threshold of 0.571 optimized on this tiny set reached 0.861 balanced
-accuracy, 0.889 answerable recall, and 0.833 unsupported-question rejection. This is
-overfit diagnostic evidence, not an approved production threshold. Refusal should not
-rely on cosine score alone.
+Similarity scores overlapped between answerable and unsupported questions. An unsupported BERT question reached 0.711, while answerable top scores started at 0.395. No cosine-only abstention threshold is applied.
 
-The evaluation also exposed a metadata limitation: canonical section detection does not
-fully represent every paper-specific heading and can become domain-specific quickly.
-Section inference was therefore removed from the RAG baseline. Section remains nullable
-metadata in the API, not a retrieval prefilter.
-The downloaded PDFs, labelled questions, temporary Chroma index, and evaluation script
-were intentionally kept outside the repository; this document preserves the method and
-results without shipping benchmark scaffolding as a product feature.
+## Context preservation
 
-## Chunk Size and Overlap Experiment
+The context builder was evaluated on the same 24 questions.
 
-The current sentence/token chunker was tested unchanged on the 15-page *Attention Is All
-You Need* PDF with two configurations: the production baseline of 220 tokens with 40-token
-overlap, and a larger 250-token configuration with 20-token overlap. MiniLM's verified
-maximum sequence length is 256 tokens, so larger values would truncate indexed content.
+| Metric | Recorded result |
+| --- | ---: |
+| Relevant-page retention, 18 answerable questions | 1.000 |
+| Raw top-five source chunks | 120 |
+| Cited passages after overlap merging | 101 |
+| Source chunks retained | 120 |
+| Mean context size | 859.4 tokens |
+| Maximum context size | 1,073 tokens |
+| Contexts over 1,200 tokens | 0 |
 
-Five fixed questions covered the abstract, the problem addressed by the paper, encoder
-layer count, scaled-attention rationale, and positional encoding. Ground-truth pages were
-verified against rendered PDF pages before evaluation. Both configurations used the same
-MiniLM embeddings, Chroma search, and top-five ranking.
+The measurement tests provenance retention and budgeting. Unsupported questions can still receive context.
 
-| Configuration | Chunks | Recall@1 | Recall@3 | Recall@5 | MRR@5 |
+## Representation experiments
+
+A cached-model CPU comparison on twelve synthetic passages and twelve answerable questions gave Recall@1, Recall@3, Recall@5, and MRR of 1.000 for both MiniLM and BGE-small. Recorded index/query times were 0.045/0.017 seconds for MiniLM and 0.061/0.036 seconds for BGE-small. The small corpus did not establish a retrieval-quality winner.
+
+A five-question chunking comparison on the 15-page Transformer PDF produced:
+
+| Chunk size / overlap | Chunks | Recall@1 | Recall@3 | Recall@5 | MRR@5 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 220 tokens / 40 overlap | 65 | 0.600 | 0.800 | 0.800 | 0.700 |
-| 250 tokens / 20 overlap | 54 | 0.600 | 0.800 | 0.800 | 0.700 |
+| 220 / 40 tokens | 65 | 0.600 | 0.800 | 0.800 | 0.700 |
+| 250 / 20 tokens | 54 | 0.600 | 0.800 | 0.800 | 0.700 |
 
-Both settings ranked the abstract page second, failed to retrieve pages 1 or 2 for the
-broad problem question, and ranked the correct page first for the other three questions.
-The larger setting therefore reduced the index by 11 chunks but produced no retrieval
-quality gain. Its lower overlap also separated part of the scaled-attention rationale
-from the sentence stating the scaling action. The 220/40 baseline remains unchanged.
+Larger chunks reduced index size without improving this comparison. The 220/40 configuration was retained.
 
-This experiment indicates that chunk size is not the primary cause of the two observed
-failures. Future work should evaluate PDF-layout cleanup and retrieval/reranking changes
-independently rather than increasing chunks beyond MiniLM's useful input length. The PDF,
-rendered pages, temporary Chroma indexes, and experiment script remain outside the repo.
+A separate PDF-cleaning experiment kept the chunker, model, and retrieval configuration fixed:
 
-## PDF Cleaning Experiment
-
-Before implementation, a coordinate-based cleaning prototype was tested on two PDFs:
-*Attention Is All You Need* and BERT. The chunker, MiniLM model, Chroma retrieval, and
-220-token/40-overlap configuration stayed fixed. The experiment compared raw PyMuPDF
-plain text, geometry-only cleaning, and geometry plus aggressive line/hyphen normalization.
-
-Geometry-only cleaning removed only high-confidence artifacts: narrow side arXiv
-watermarks, standalone bottom page numbers, and repeated margin blocks when present. It
-did not change retrieval metrics on either paper.
-
-| Paper | Variant | Chunks | Recall@1 | Recall@3 | Recall@5 | MRR@5 |
+| Paper | Extraction variant | Chunks | Recall@1 | Recall@3 | Recall@5 | MRR@5 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Transformer | raw | 65 | 0.600 | 0.800 | 0.800 | 0.700 |
-| Transformer | geometry-only clean | 65 | 0.600 | 0.800 | 0.800 | 0.700 |
-| Transformer | geometry + line normalization | 64 | 0.600 | 0.800 | 0.800 | 0.700 |
-| BERT | raw | 109 | 0.800 | 0.800 | 0.800 | 0.800 |
-| BERT | geometry-only clean | 109 | 0.800 | 0.800 | 0.800 | 0.800 |
-| BERT | geometry + line normalization | 99 | 0.600 | 0.800 | 0.800 | 0.700 |
+| Transformer | Raw | 65 | 0.600 | 0.800 | 0.800 | 0.700 |
+| Transformer | Geometry-only cleaning | 65 | 0.600 | 0.800 | 0.800 | 0.700 |
+| Transformer | Geometry and line normalization | 64 | 0.600 | 0.800 | 0.800 | 0.700 |
+| BERT | Raw | 109 | 0.800 | 0.800 | 0.800 | 0.800 |
+| BERT | Geometry-only cleaning | 109 | 0.800 | 0.800 | 0.800 | 0.800 |
+| BERT | Geometry and line normalization | 99 | 0.600 | 0.800 | 0.800 | 0.700 |
 
-The aggressive normalization repaired 326 line-end hyphenations in BERT but changed chunk
-boundaries enough to move the architecture answer from rank one to rank two. This is a
-regression, so it should not be implemented as-is. Geometry-only cleaning is safe but did
-not address the known abstract and broad-problem failures. Those failures remain ranking
-issues, not primarily PDF-noise issues.
+Aggressive normalization repaired 326 BERT hyphenations but changed chunk boundaries and reduced Recall@1. It was not adopted. Geometry-only cleaning did not improve retrieval in these comparisons.
 
-No production code was changed by this experiment. The temporary scripts, rendered pages,
-and Chroma indexes remain outside the repository.
+## Implementation references
 
-## Interview Summary
-
-The embedding model converts questions and paper chunks into vectors; cosine similarity
-ranks chunks by semantic proximity. Exact cosine search was used for model comparison so
-the vector store did not influence the result. MongoDB remains the source of truth, while
-the future vector store acts as a rebuildable retrieval index. MiniLM is a measured local
-baseline whose limitations and replacement conditions are explicit.
+[Chunking](../backend/app/rag/chunking.py) · [Reranking](../backend/app/rag/reranking.py) · [Context builder](../backend/app/rag/context.py) · [Tests](../backend/tests/)

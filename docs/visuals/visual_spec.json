@@ -1,0 +1,569 @@
+{
+  "diagrams": [
+    {
+      "width": 1120,
+      "height": 960,
+      "title": "RAG pipeline: scientific PDF to cited context",
+      "description": "Page-aware indexing, semantic retrieval, reranking, and source-linked evidence.",
+      "filename": "architecture.svg",
+      "elements": [
+        {
+          "kind": "text",
+          "x": 40,
+          "y": 42,
+          "text": "PAPERPAL / DOCUMENT ARCHITECTURE",
+          "font_size": 13,
+          "fill": "#0f766e",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 40,
+          "y": 84,
+          "text": "RAG pipeline: scientific PDF to cited context",
+          "font_size": 29,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 40,
+          "y": 116,
+          "text": "Page-aware indexing, semantic retrieval, reranking, and source-linked evidence.",
+          "font_size": 16,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 40,
+          "y": 150,
+          "width": 1040,
+          "height": 220,
+          "rx": 16,
+          "fill": "#f1f5f9",
+          "stroke": "#dde5ed",
+          "stroke_width": 1
+        },
+        {
+          "kind": "text",
+          "x": 60,
+          "y": 178,
+          "text": "UPLOAD AND READING TOOLS",
+          "font_size": 12,
+          "fill": "#475569",
+          "font_weight": 700
+        },
+        {
+          "kind": "rect",
+          "x": 60,
+          "y": 210,
+          "width": 270,
+          "height": 84,
+          "rx": 12,
+          "fill": "#ffffff",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 60,
+          "y": 222,
+          "width": 4,
+          "height": 60,
+          "fill": "#335d9e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 237,
+          "text": "Streamlit → FastAPI",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 260,
+          "text": "Upload and reading requests",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 405,
+          "y": 210,
+          "width": 280,
+          "height": 84,
+          "rx": 12,
+          "fill": "#ffffff",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 405,
+          "y": 222,
+          "width": 4,
+          "height": 60,
+          "fill": "#335d9e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 237,
+          "text": "PDF extraction",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 260,
+          "text": "Page text and character offsets",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 760,
+          "y": 210,
+          "width": 295,
+          "height": 84,
+          "rx": 12,
+          "fill": "#eaf5f2",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 760,
+          "y": 222,
+          "width": 4,
+          "height": 60,
+          "fill": "#0f766e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 237,
+          "text": "MongoDB",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 260,
+          "text": "Documents, summaries, full chunks",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "path",
+          "d": "M330,252 L405,252",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "path",
+          "d": "M685,252 L760,252",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "text",
+          "x": 60,
+          "y": 341,
+          "text": "Reading tools: local DistilBART summaries · YAKE keywords · TF-IDF document comparison",
+          "font_size": 15,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 40,
+          "y": 398,
+          "width": 1040,
+          "height": 190,
+          "rx": 16,
+          "fill": "#f1f5f9",
+          "stroke": "#dde5ed",
+          "stroke_width": 1
+        },
+        {
+          "kind": "text",
+          "x": 60,
+          "y": 426,
+          "text": "INDEXING / ONE PAPER AT A TIME",
+          "font_size": 12,
+          "fill": "#475569",
+          "font_weight": 700
+        },
+        {
+          "kind": "rect",
+          "x": 60,
+          "y": 455,
+          "width": 270,
+          "height": 84,
+          "rx": 12,
+          "fill": "#ffffff",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 60,
+          "y": 467,
+          "width": 4,
+          "height": 60,
+          "fill": "#335d9e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 482,
+          "text": "Page-aware chunks",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 505,
+          "text": "220 tokens / 40-token overlap",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 405,
+          "y": 455,
+          "width": 280,
+          "height": 84,
+          "rx": 12,
+          "fill": "#efedf8",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 405,
+          "y": 467,
+          "width": 4,
+          "height": 60,
+          "fill": "#6860a5",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 482,
+          "text": "MiniLM embeddings",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 505,
+          "text": "all-MiniLM-L6-v2",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 760,
+          "y": 455,
+          "width": 295,
+          "height": 84,
+          "rx": 12,
+          "fill": "#eaf5f2",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 760,
+          "y": 467,
+          "width": 4,
+          "height": 60,
+          "fill": "#0f766e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 482,
+          "text": "Persistent Chroma",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 505,
+          "text": "Vectors and chunk identifiers",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "path",
+          "d": "M907,294 L907,386 L315,386 L315,455",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "path",
+          "d": "M330,497 L405,497",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "path",
+          "d": "M685,497 L760,497",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "rect",
+          "x": 40,
+          "y": 618,
+          "width": 1040,
+          "height": 235,
+          "rx": 16,
+          "fill": "#f1f5f9",
+          "stroke": "#dde5ed",
+          "stroke_width": 1
+        },
+        {
+          "kind": "text",
+          "x": 60,
+          "y": 646,
+          "text": "RETRIEVAL / QUESTION + PAPER ID",
+          "font_size": 12,
+          "fill": "#475569",
+          "font_weight": 700
+        },
+        {
+          "kind": "rect",
+          "x": 60,
+          "y": 679,
+          "width": 270,
+          "height": 100,
+          "rx": 12,
+          "fill": "#ffffff",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 60,
+          "y": 691,
+          "width": 4,
+          "height": 76,
+          "fill": "#335d9e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 706,
+          "text": "Candidate search",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 729,
+          "text": "Filter paper and index version",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "text",
+          "x": 77,
+          "y": 747,
+          "text": "Up to 20 vector candidates",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 405,
+          "y": 679,
+          "width": 280,
+          "height": 100,
+          "rx": 12,
+          "fill": "#ffffff",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 405,
+          "y": 691,
+          "width": 4,
+          "height": 76,
+          "fill": "#335d9e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 706,
+          "text": "Transparent reranking",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 729,
+          "text": "60% vector / 40% lexical",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "text",
+          "x": 422,
+          "y": 747,
+          "text": "Return top-k evidence",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "rect",
+          "x": 760,
+          "y": 679,
+          "width": 295,
+          "height": 100,
+          "rx": 12,
+          "fill": "#e8f2fc",
+          "stroke": "#cbd5e1",
+          "stroke_width": 1
+        },
+        {
+          "kind": "rect",
+          "x": 760,
+          "y": 691,
+          "width": 4,
+          "height": 76,
+          "fill": "#335d9e",
+          "rx": 2
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 706,
+          "text": "Cited context",
+          "font_size": 17,
+          "fill": "#0f172a",
+          "font_weight": 700
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 729,
+          "text": "Merge overlapping source spans",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "text",
+          "x": 777,
+          "y": 747,
+          "text": "5 passages / 1,200-token budget",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "path",
+          "d": "M907,539 L907,604 L315,604 L315,679",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "path",
+          "d": "M330,729 L405,729",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "path",
+          "d": "M685,729 L760,729",
+          "fill": "none",
+          "stroke": "#64748b",
+          "stroke_width": 1.8,
+          "marker_end": "url(#arrow)"
+        },
+        {
+          "kind": "text",
+          "x": 60,
+          "y": 829,
+          "text": "MongoDB supplies complete passages and page offsets for the retrieved chunk IDs.",
+          "font_size": 13,
+          "fill": "#475569",
+          "font_weight": 400
+        },
+        {
+          "kind": "line",
+          "x1": 40,
+          "y1": 905,
+          "x2": 1080,
+          "y2": 905,
+          "stroke": "#dbe3ec"
+        },
+        {
+          "kind": "text",
+          "x": 40,
+          "y": 932,
+          "text": "The retrieval endpoint returns evidence and source metadata. Portfolio UI demonstrations are presented separately.",
+          "font_size": 12,
+          "fill": "#475569",
+          "font_weight": 400
+        }
+      ]
+    }
+  ],
+  "plots": []
+}
